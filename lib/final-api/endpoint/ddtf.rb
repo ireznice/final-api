@@ -20,7 +20,7 @@ module FinalAPI::Endpoint
         builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
         builds = builds.ddtf_search(params[:q])
 
-        # HACK: workaround make builds valid, could be removed later, when DB 
+        # HACK: workaround make builds valid, could be removed later, when DB
         # will be valid
         builds.each { |b| b.sanitize }
 
@@ -88,21 +88,21 @@ module FinalAPI::Endpoint
       #   :event_type
       #   :after_number
       # if repository_id is not provided returns Build.recent
-      app.get '/builds' do
+      app.get '/ddtf/builds' do
         params["ids"] = params['ids'].split(',') if String === params['ids']
         result = Travis.service(:find_builds, params).run
         FinalAPI::Builder.new(result).data.to_json
       end
 
-      app.post '/builds/:id/cancel' do
-        service = Travis.service(:cancel_build, current_user, params.merge(source: 'api'))
+      app.post '/ddtf/builds/:id/cancel' do
+        service = Travis.service(:cancel_ddtf_build, current_user, params.merge(source: 'api'))
         halt(403, { messages: service.messages }.to_json) unless service.authorized?
-        halt(422, { messages: service.messages }.to_json) unless service.can_cancel?
-        Travis.run_service(:cancel_build, current_user, { id: params['id'], source: 'api' })
+        halt(204, { messages: service.messages }.to_json) unless service.build
+        Travis.run_service(:cancel_ddtf_build, current_user, { id: params['id'] })
         halt 202
       end
 
-      app.post '/builds/:id/restart' do
+      app.post '/ddtf/builds/:id/restart' do
         service = Travis.service(:reset_model, current_user, build_id: params[:id])
         halt(403, { messages: service.messages }.to_json) unless service.accept?
         Travis.run_service(:reset_model, current_user, build_id: params['id'])
