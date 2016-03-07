@@ -13,7 +13,9 @@ production:
     vhost: travisci.development
   test_results:
     results_path: '/data/final-ci/test-results'
-
+  ddtf:
+    command_node_queue: commands.windows.ussnode
+    cancel_command_prefix: cmd.
 
 development:
   log_level: :debug
@@ -29,6 +31,9 @@ development:
     username: travisci_worker
     password: travisci_worker_password
     vhost: travisci.development
+  ddtf:
+    command_node_queue: commands.windows.ussnode
+    cancel_command_prefix: cmd.
 
 test:
   log_level: :warn
@@ -45,5 +50,6 @@ test:
     username: travisci_worker
     password: travisci_worker_password
     vhost: travisci.development
-
-
+  ddtf:
+    command_node_queue: commands.windows.ussnode
+    cancel_command_prefix: cmd.
