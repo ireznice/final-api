@@ -52,6 +52,9 @@ module FinalAPI
               halt 422, { error: 'Unable to parse TSD data: ' + err.message }.to_json
             end
 
+            enqueue_data.normalize
+            enqueue_data.resolve_strategy
+
             halt 400, enqueue_data.errors.to_json unless enqueue_data.valid?
 
             config = DdtfHelpers.build_config(payload, tsd)
@@ -70,12 +73,13 @@ module FinalAPI
             build = DdtfHelpers.create_build(repository.id, user.id, config)
 
             halt 422, { error: 'Could not create new build' }.to_json if build.nil?
-            payload = payload.merge('BuildId' => build.id)
 
-            enqueue_data.normalize_runtime_config
-            enqueue_data.resolve_strategy
             cluster_name = enqueue_data.clusters.first
             cluster_endpoint = FinalAPI.config.tsd_utils.clusters[cluster_name.to_sym]
+
+            enqueue_data.enqueue_data['BuildId'] = build.id
+            enqueue_data.build
+            enqueue_data.resolve_email
 
             node_starter_data = {
               build_id: build.id,
@@ -84,7 +88,7 @@ module FinalAPI
                 cluster_name: cluster_name,
                 enqueued_by: request.env['HTTP_NAME']
               },
-              enqueue_data: TsdUtils::EnqueueData.prepare_xml(payload)
+              enqueue_data: enqueue_data.to_xml
             }
 
             publisher = Travis::Amqp::Publisher.new(Travis.config.ddtf.node_queue)
