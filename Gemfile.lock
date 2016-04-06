@@ -57,7 +57,7 @@ GIT
 
 GIT
   remote: git@github.com:AVGTechnologies/tsd_utils.git
-  revision: 8f402a0c92c7dfb80b8cf41cef5abc74b0f046c6
+  revision: 430bbd9289424ce890f9d899e9838135244a2654
   specs:
     tsd_utils (0.2.0)
       activesupport (= 3.2.22)

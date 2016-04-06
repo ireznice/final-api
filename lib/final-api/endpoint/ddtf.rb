@@ -48,13 +48,17 @@ module FinalAPI
 
             begin
               tsd = enqueue_data.load_tsd
+              enqueue_data.normalize
+              enqueue_data.resolve_strategy
+              enqueue_data.build
+              enqueue_data.resolve_email
             rescue => err
-              halt 422, { error: 'Unable to parse TSD data: ' + err.message }.to_json
+              halt 422, { error: 'Unable to process TSD data: ' + err.message }.to_json
             end
 
             halt 400, enqueue_data.errors.to_json unless enqueue_data.valid?
 
-            config = DdtfHelpers.build_config(payload, tsd)
+            config = DdtfHelpers.build_config(payload, enqueue_data.tsd.tsd)
 
             user_name = env['HTTP_NAME']
             halt 422, { error: "'name' header not specified" } if user_name.blank?
@@ -70,12 +74,11 @@ module FinalAPI
             build = DdtfHelpers.create_build(repository.id, user.id, config)
 
             halt 422, { error: 'Could not create new build' }.to_json if build.nil?
-            payload = payload.merge('BuildId' => build.id)
 
-            enqueue_data.normalize_runtime_config
-            enqueue_data.resolve_strategy
             cluster_name = enqueue_data.clusters.first
             cluster_endpoint = FinalAPI.config.tsd_utils.clusters[cluster_name.to_sym]
+
+            enqueue_data.enqueue_data['BuildId'] = build.id
 
             node_starter_data = {
               build_id: build.id,
@@ -84,7 +87,7 @@ module FinalAPI
                 cluster_name: cluster_name,
                 enqueued_by: request.env['HTTP_NAME']
               },
-              enqueue_data: TsdUtils::EnqueueData.prepare_xml(payload)
+              enqueue_data: enqueue_data.to_xml
             }
 
             publisher = Travis::Amqp::Publisher.new(Travis.config.ddtf.node_queue)
