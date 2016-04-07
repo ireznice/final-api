@@ -48,6 +48,7 @@ module FinalAPI
 
             begin
               tsd = enqueue_data.load_tsd
+              tsd['source']['git'].sub!('ddtf|master', "ddtf|EOA-6615") if tsd['source']['git']
             rescue => err
               halt 422, { error: 'Unable to parse TSD data: ' + err.message }.to_json
             end

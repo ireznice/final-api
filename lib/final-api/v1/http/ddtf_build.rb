@@ -16,6 +16,18 @@ module FinalAPI
           @request = build.request
         end
 
+        def build_state_map
+          {
+            'created' => 'Configured',
+            'received' => 'Pending',
+            'started' => 'Running',
+            'passed' => 'Finished',
+            'failed' => 'Finished',
+            'canceled' => 'Stopped',
+            'errored' => 'Aborted'
+          }
+        end
+
         #statuses are mapped in app/common/filters/status-class-filter.js on AtomUI side
         def test_data
           config = build.config
@@ -32,7 +44,7 @@ module FinalAPI
             'build' => config[:build],
 
             #configured, pending, running, stopping, finished, stoped, aborted
-            'status' => build.state, #TODO: convert to state?
+            'status' => build_state_map[build.state.to_s.downcase], #TODO: convert to state?
             'strategy': config[:strategy],
             'email': config[:email],
 
@@ -69,7 +81,7 @@ module FinalAPI
 
         def atom_response
           {
-            id: build.id,
+            id: build.id.to_s, # BAMBOO
             name: build.config[:name],
             build: build.config[:build], # this is old DDTF build, not meaning test
             result: 'NotSet',
@@ -113,6 +125,16 @@ module FinalAPI
           end
         end
 
+        def results_map
+          {
+            'created' => 'NotSet',
+            'blocked' => 'NotTested',
+            'passed' => 'Passed',
+            'failed' => 'Failed',
+            'pending' => 'NotSet'
+          }
+        end
+
         def ddtf_test_aggregation_result
           return @ddtf_test_aggregation_result if (
             defined?(@ddtf_test_aggregation_result) &&
@@ -124,12 +146,24 @@ module FinalAPI
             ->(job) { job.ddtf_part },
             ->(job) { job.ddtf_machine },
             lambda do |step_result|
+
+              all_machines_state = step_result.results.inject("Passed") do |s, (_k, v)|
+                s == "Passed" && v[:result] == 'passed' ? "Passed" : "Failed"
+              end
+
+              addition = {
+                          'all'=> {
+                                    result: all_machines_state
+                                  }
+                        }
+
               {
+                id: step_result.__id__,
                 description: step_result.name,
                 machines: step_result.results.inject({}) do |s, (k, v)|
-                  s[k] = { result: v[:result], message: '', resultId: v[:uuid] }
+                  s[k] = { result: results_map[v[:result]], message: '', resultId: v[:uuid] }
                   s
-                end
+                end.merge(addition)
               }
             end,
             ->(step_result) {
