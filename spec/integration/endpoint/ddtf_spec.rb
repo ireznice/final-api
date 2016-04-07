@@ -215,7 +215,7 @@ describe 'DDTF' do
         'description' => 'myDescription',
         'branch' => nil,
         'build' => nil,
-        'status' => 'passed',
+        'status' => 'Finished',
         'strategy' => nil,
         'email' => nil,
         'startedBy' => 'Sven Fuchs',
