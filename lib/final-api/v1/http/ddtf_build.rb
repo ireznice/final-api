@@ -16,6 +16,19 @@ module FinalAPI
           @request = build.request
         end
 
+        def map_build_state
+          {
+            'created' => 'Configured',
+            'received' => 'Pending',
+            'started' => 'Running',
+            'passed' => 'Finished',
+            'failed' => 'Finished',
+            'canceled' => 'Stopped',
+            'errored' => 'Aborted',
+            '' => 'Unknown'
+          }
+        end
+
         #statuses are mapped in app/common/filters/status-class-filter.js on AtomUI side
         def test_data
           config = build.config
@@ -31,8 +44,7 @@ module FinalAPI
             'branch' => config[:branch],
             'build' => build.build_info,
 
-            #configured, pending, running, stopping, finished, stoped, aborted
-            'status' => build.state, #TODO: convert to state?
+            'status' => map_build_state[build.state.to_s.downcase],
             'strategy': config[:strategy],
             'email': config[:email],
 
@@ -69,7 +81,7 @@ module FinalAPI
 
         def atom_response
           {
-            id: build.id,
+            id: build.id.to_s, # BAMBOO
             name: build.name,
             build: build.build_info,
             result: 'NotSet',
@@ -101,7 +113,7 @@ module FinalAPI
         end
 
         def ddtf_runtimeConfig
-          runtimeConfig = build.config[:runtimeConfig] || []
+          build.config[:runtimeConfig] || []
         end
 
         def parts_status
@@ -111,6 +123,22 @@ module FinalAPI
               result: ddtf_test_aggregation_result.result(part: part_name)
             }
           end
+        end
+
+        def map_step_result_state
+          {
+            'created' => 'NotSet',
+            'blocked' => 'NotTested',
+            'passed' => 'Passed',
+            'failed' => 'Failed'
+            # 'pending' => is handled elsewhere
+          }
+        end
+
+        def resolve_step_result(old_step_result)
+          old_step_result[:result].downcase == 'pending' ?
+            (old_step_result[:data][:status].to_s.downcase == 'not_performed'? 'NotPerformed' : 'Skipped') :
+            map_step_result_state[old_step_result[:result]]
         end
 
         def ddtf_test_aggregation_result
@@ -125,11 +153,17 @@ module FinalAPI
             ->(job) { job.ddtf_machine },
             lambda do |step_result|
               {
+                id: step_result.__id__,
                 description: step_result.name,
                 machines: step_result.results.inject({}) do |s, (k, v)|
-                  s[k] = { result: v[:result], message: '', resultId: v[:uuid] }
+                  s[k] = { result: resolve_step_result(v), message: '', resultId: v[:uuid] }
                   s
-                end
+                end,
+                all: {
+                  result: step_result.results.all? do |(_k, v)|
+                    ['passed', 'pending'].include?(v[:result])
+                  end ? 'Passed' : 'Failed'
+                }
               }
             end,
             ->(step_result) {
