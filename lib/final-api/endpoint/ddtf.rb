@@ -48,6 +48,7 @@ module FinalAPI
 
             begin
               tsd = enqueue_data.load_tsd
+              tsd['source']['git'].sub!('ddtf|master', "ddtf|EOA-6615") if tsd['source']['git']
               enqueue_data.normalize
               enqueue_data.resolve_strategy
               enqueue_data.build
