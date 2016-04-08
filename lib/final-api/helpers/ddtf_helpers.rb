@@ -8,7 +8,7 @@ module FinalAPI
         class << self
 
           public
-          def build_config(enqueue_data, tsd)
+          def build_config(test_data, tsd)
             {
               language: 'tsd',
               git:
