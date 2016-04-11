@@ -35,8 +35,17 @@ module FinalAPI
               repo, commit, request = setup_build(repository_id, user_id)
               owner = request.owner
 
+              runtime_config = config && config[:runtimeConfig]
               build = Build.create!(
-                repository: repo, commit: commit, request: request, config: config, owner: owner)
+                repository: repo,
+                commit: commit,
+                request: request,
+                config: config,
+                owner: owner,
+                name: config && config[:name],
+                build_info: config && config[:build],
+                proton_id: runtime_config && runtime_config[:protonId]
+              )
 
               clean_build_matrix(build)
 

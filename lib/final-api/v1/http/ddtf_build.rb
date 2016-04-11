@@ -26,10 +26,10 @@ module FinalAPI
             'ddtfUuid' => config[:ddtf_uuid] ||
               config[:ddtf_uid] ||
               config[:ddtfUuid],
-            'name' => config[:name],
+            'name' => build.name,
             'description' => config[:description],
             'branch' => config[:branch],
-            'build' => config[:build],
+            'build' => build.build_info,
 
             #configured, pending, running, stopping, finished, stoped, aborted
             'status' => build.state, #TODO: convert to state?
@@ -41,7 +41,7 @@ module FinalAPI
             'startedBy': build.owner.try(:name).to_s,
 
             'stopped': build.state == 'cancelled',
-            'stoppedBy': nil, # TODO
+            'stoppedBy': build.stopped_by.try(:name), # TODO
 
             'isTsd': true,
             'checkpoints':    config[:checkpoints],
@@ -70,8 +70,8 @@ module FinalAPI
         def atom_response
           {
             id: build.id,
-            name: build.config[:name],
-            build: build.config[:build], # this is old DDTF build, not meaning test
+            name: build.name,
+            build: build.build_info,
             result: 'NotSet',
             results:
             {

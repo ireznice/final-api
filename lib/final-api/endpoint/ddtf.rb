@@ -93,6 +93,8 @@ module FinalAPI
             publisher = Travis::Amqp::Publisher.new(Travis.config.ddtf.node_queue)
             publisher.publish(node_starter_data)
 
+            # TODO: imho atom_response should be removed,
+            #  FinalAPI::V1::Http::DDTF_Build#test_data should be used
             halt 200, FinalAPI::V1::Http::DDTF_Build.new(build, {}).atom_response.to_json
           end
 

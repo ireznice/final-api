@@ -5,25 +5,24 @@ class Build
 
   # Represents metadat for query language used by frondend
   # *key* are query keywords
-  # *values* are columns in DB (use Postgres JSON ->> operator)
+  # *values* are columns in DB
   SEARCH_TOKENS_DEF = {
-    ['id']                => 'id',
-    ['nam', 'name']       => 'config ->> \'name\'',
-    ['enq', 'enqueuedBy'] => 'config ->> \'enqueuedBy\'',
-    ['sta', 'startedBy']  => 'config ->> \'startedBy\'',
-    ['sto', 'stoppedBy']  => 'config ->> \'stoppedBy\'',
+    ['id']                    => 'id',  #where(id OP id)
+    ['nam', 'name']           => 'name',
+    ['sta', 'startedBy']      => 'owner_id',  # where('owner_id IN (?)', User.where('name ILIKE ?', '%KEY%'))
+    ['sto', 'stoppedBy']      => 'stopped_by_id',
     ['sts', 'stat', 'status', 'state'] => 'state',
-    ['que', 'queueName']  => 'config ->> \'queueName\'',
-    ['bui', 'build']      => 'config ->> \'build\'',
-    ['protonid', 'protonId'] => 'config ->> \'protonId\''
+    ['bui', 'build']          => 'build_info',
+    ['buildId', 'protonId']  => 'protonId'
   }
+
 
   def self.ddtf_search(query)
     res = scoped
     return res if query.blank?
     res_query = query.dup
     SEARCH_TOKENS_DEF.each_pair do |keys, column|
-      if res_query.sub!(/(?:#{keys.join('|')})\s*([:=])\s*("(?:[^"]*?")|[\w\d_]+)/, '')
+      if res_query.sub!(/(?:#{keys.join('|')})\s*([:=])\s*("(?:[^"]*?")|\S+)/, '')
         op = $1
         term = $2.gsub(/\A"(.*)"\z/, '\1')
         res = res.ddtf_search_column(column, op, term)
@@ -31,12 +30,21 @@ class Build
     end
     # when no keyword found search in `name` field by "contaions" operator
     if res_query == query
-      res = res.ddtf_search_column('config ->> \'name\'', ':', query)
+      res = res.ddtf_search_column('name', ':', query)
     end
     res
   end
 
   def self.ddtf_search_column(column, operator, term)
+    if (column == 'owner_id') || (column == 'stopped_by_id')
+      if operator == ':'
+        term = User.where("name ILIKE ?", "%#{term}%").pluck(:id)
+      else
+        term = User.where(name: term).pluck(:id)
+      end
+      operator = 'IN'
+    end
+
     case operator
     when '='
       # makes search quite slow (and without index)
@@ -48,10 +56,12 @@ class Build
       operator = 'ILIKE'
       term = "%#{term}%"
       column = "(#{column})::text"
+    when 'IN'
+      # empty
     else
       fail "Unknown operator: #{operator.inspect}"
     end
-    where([column, operator, '?'].join(' '), term)
+    where([column, operator, '(?)'].join(' '), term)
   end
 
 

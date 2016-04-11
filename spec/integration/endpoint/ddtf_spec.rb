@@ -94,7 +94,7 @@ describe 'DDTF' do
   context 'GET /ddtf/tests' do
     it 'returns last 20 builds by default' do
       1.upto(22) do |idx|
-        Factory(:build, config: { name: idx.to_s })
+        Factory(:build, name: idx.to_s)
       end
       get '/ddtf/tests', {}, headers
       expect(last_response.status).to eq(200)
@@ -116,7 +116,7 @@ describe 'DDTF' do
 
     it 'paginate by limit and offset params' do
       1.upto(5) do |idx|
-        Factory(:build, config: { name: idx.to_s })
+        Factory(:build, name: idx.to_s)
       end
       get '/ddtf/tests', { limit: 2, offset: 2 }, headers
       expect(last_response.status).to eq(200)
@@ -127,10 +127,15 @@ describe 'DDTF' do
     end
 
     describe 'filter by "q" param' do
+      let(:user_nomae) { Factory(:user, name: 'noname') }
+      let(:user) { Factory(:user, name: 'franta.lopata') }
       let!(:builds) do
         (1..20).map do |idx|
-          Factory(:build, config: { name: idx.to_s })
+          Factory(:build, name: idx.to_s, owner: user_nomae)
         end
+      end
+      let!(:user_build) do
+        Factory(:build, name: 'user_build', owner: user, stopped_by: user)
       end
 
       it 'search by \'nam\' and \'name\' keyword with contains operator' do
@@ -157,10 +162,35 @@ describe 'DDTF' do
         expect(response2).to eq response1
       end
 
+      it 'search by \'startedBy\' keyword with = operator' do
+        get '/ddtf/tests', { q: 'startedBy = franta.lopata' }, headers
+        expect(last_response.status).to eq(200)
+        response1 = MultiJson.load(last_response.body)
+        expect(response1.size).to eq 1
+      end
+
+      it 'search by \'stoppedBy\' keyword with : operator' do
+        get '/ddtf/tests', { q: 'stoppedBy : nta.lopa' }, headers
+        expect(last_response.status).to eq(200)
+        response1 = MultiJson.load(last_response.body)
+        expect(response1.size).to eq 1
+      end
+
+
       it 'search by combination of keywords' do
         b = builds.last
         get '/ddtf/tests',
-            { q: "name : #{b.config[:name]} id = \"#{b.id}\"" },
+            { q: "name : #{b.name} id = \"#{b.id}\"" },
+            headers
+        response = MultiJson.load(last_response.body)
+        expect(response.size).to eq 1
+        expect(response.first['id']).to eq b.id
+      end
+
+      it 'ignore words without column definition' do
+        b = builds.last
+        get '/ddtf/tests',
+            { q: "name : #{b.name} XXXXX" },
             headers
         response = MultiJson.load(last_response.body)
         expect(response.size).to eq 1
@@ -173,11 +203,13 @@ describe 'DDTF' do
                       config: {
                         name: 'TSD name',
                         description: 'myDescription'
-                      })
+                      },
+                      name: 'TSD name'
+                     )
 
       get '/ddtf/tests', {}, headers
       response = MultiJson.load(last_response.body).first
-      expect(response).to include(
+      expected_response = {
         'id' => build.id,
         'name' => 'TSD name',
         'description' => 'myDescription',
@@ -201,8 +233,10 @@ describe 'DDTF' do
         'parts' => [{ 'name' => nil, 'result' => 'created' }],
         'tags' => [],
         'result' => 'passed',
-        'results' => [{ 'type' => 'created', 'value' => 1.0 }]
-      )
+        'results' => [{ 'type' => 'created', 'value' => 1.0 }],
+        'buildId' => build.id
+      }
+      expect(response).to include(expected_response)
     end
   end
 
