@@ -9,13 +9,26 @@ class Build
   SEARCH_TOKENS_DEF = {
     ['id']                    => 'id',  #where(id OP id)
     ['nam', 'name']           => 'name',
-    ['sta', 'startedBy']      => 'owner_id',  # where('owner_id IN (?)', User.where('name ILIKE ?', '%KEY%'))
-    ['sto', 'stoppedBy']      => 'stopped_by_id',
+    ['sta', 'startedby']      => 'owner_id',  # where('owner_id IN (?)', User.where('name ILIKE ?', '%KEY%'))
+    ['sto', 'stoppedby']      => 'stopped_by_id',
     ['sts', 'stat', 'status', 'state'] => 'state',
     ['bui', 'build']          => 'build_info',
-    ['buildId', 'protonId']  => 'protonId'
+    ['buildid', 'protonid']  => 'protonId'
   }
 
+  def self.search(query, limit, offset)
+    search_struct = parse_query(query)
+    query = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
+    search_struct.each do |request|
+      if request[1] == ":"
+        query = query.where("#{request[0]} ILIKE :expr", expr: "%#{request[2]}%")
+      else
+        query = query.where("#{request[0]} = :expr", expr: "%#{request[2]}%")
+      end
+    end
+
+    query
+  end
 
   def self.ddtf_search(query)
     res = scoped
@@ -83,6 +96,20 @@ class Build
 
   private
 
+  def self.parse_query(query)
+    array = query.scan(/([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/)
+    array.map do |item|
+      query_key = item[0].downcase
+      column = SEARCH_TOKENS_DEF.select { |k| k.include? query_key }.values.first
+      raise "Wrong search definition specified" if column.nil?
+
+      [
+        column,
+        item[1],
+        item[2].tr("\"", '')
+      ]
+    end
+  end
 end
 
 class Job

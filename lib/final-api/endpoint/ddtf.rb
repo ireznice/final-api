@@ -58,8 +58,9 @@ module FinalAPI
           app.get '/ddtf/tests' do
             limit = params[:limit] ? params[:limit].to_i : 20
             offset = params[:offset] ? params[:offset].to_i : 0
-            builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
-            builds = builds.ddtf_search(params[:q])
+            builds = Build.search(params[:q], limit, offset)
+            #builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
+            #builds = builds.ddtf_search(params[:q])
 
             # HACK: workaround make builds valid, could be removed later, when DB
             # will be valid
