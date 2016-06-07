@@ -18,22 +18,14 @@ module FinalAPI
           end
 
           app.get '/ddtf/tests/new' do
-            halt 400, {
-                status: 'error',
-                data: nil,
-                message: 'Please provide stashTSDLink url'
-            }.to_json unless params[:stashTSDLink]
+            halt_with_400('Please provide stashTSDLink url') unless params[:stashTSDLink]
 
             tsd = nil
             begin
               tsd_content = TsdUtils::ContentFetcher.load(params[:stashTSDLink])
               tsd = JSON.parse(tsd_content.encode('ASCII', undef: :replace, replace: ''))
             rescue
-              halt 404, {
-                  status: 'error',
-                  data: nil,
-                  message: "Unable to load tsd from: #{params[:stashTSDLink]}"
-              }.to_json
+              halt_with_404("Unable to load tsd from: #{params[:stashTSDLink]}")
             end
 
             source = tsd.get_ikey('source')
@@ -56,21 +48,20 @@ module FinalAPI
 
           # /ddtf/tests?limit=20&offset=0&q=yyyy+id:+my_id
           app.get '/ddtf/tests' do
-            limit = params[:limit] ? params[:limit].to_i : 20
-            offset = params[:offset] ? params[:offset].to_i : 0
-            builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
-            builds = builds.ddtf_search(params[:q])
+            begin
+              limit = params[:limit] ? params[:limit].to_i : 20
+              offset = params[:offset] ? params[:offset].to_i : 0
+              builds = Build.search(params[:q], limit, offset)
 
-            # HACK: workaround make builds valid, could be removed later, when DB
-            # will be valid
-            builds.each { |b| b.sanitize }
-
-            FinalAPI::V1::Http::DDTF_Builds.new(builds, {}).data.to_json
+              FinalAPI::V1::Http::DDTF_Builds.new(builds, {}).data.to_json
+            rescue Build::InvalidQueryError => e
+              halt_with_400(e.to_s)
+            end
           end
 
           app.get '/ddtf/tests/:id/executionLogs' do
             build = Build.find(params[:id])
-            
+
             FinalAPI::V1::Http::DDTF_Build.new(build).execution_logs.to_json
           end
 
@@ -107,7 +98,7 @@ module FinalAPI
             begin
               enqueue_data.build_all
             rescue => err
-              halt 422, { error: 'Unable to process TSD data: ' + err.message }.to_json
+              halt_with_422('Unable to process TSD data: ' + err.message)
             end
 
             halt 400, enqueue_data.errors.to_json unless enqueue_data.valid?
@@ -115,7 +106,7 @@ module FinalAPI
             config = DdtfHelpers.build_config(payload, enqueue_data)
 
             user_name = env['HTTP_NAME']
-            halt 422, { error: "'name' header not specified" } if user_name.blank?
+            halt_with_422("'name' header not specified") if user_name.blank?
             user = User.find_by_name(user_name) ||
                    User.create!(
                     name: user_name,
@@ -127,7 +118,7 @@ module FinalAPI
 
             build = DdtfHelpers.create_build(repository.id, user.id, config)
 
-            halt 422, { error: 'Could not create new build' }.to_json if build.nil?
+            halt_with_422('Could not create new build') if build.nil?
 
             cluster_name = enqueue_data.clusters.first
             cluster_endpoint = FinalAPI.config.tsd_utils.clusters[cluster_name.to_sym]

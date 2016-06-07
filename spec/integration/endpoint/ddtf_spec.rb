@@ -187,7 +187,7 @@ describe 'DDTF' do
       end
 
 
-      it 'search by combination of keywords' do
+      it 'searches by combination of keywords' do
         b = builds.last
         get '/ddtf/tests',
             { q: "name : #{b.name} id = \"#{b.id}\"" },
@@ -197,14 +197,23 @@ describe 'DDTF' do
         expect(response.first['id']).to eq b.id
       end
 
-      it 'ignore words without column definition' do
-        b = builds.last
-        get '/ddtf/tests',
-            { q: "name : #{b.name} XXXXX" },
-            headers
-        response = MultiJson.load(last_response.body)
-        expect(response.size).to eq 1
-        expect(response.first['id']).to eq b.id
+      context 'when invalid query given' do
+        let(:invalid_expression) { 'craaaaaazy' }
+        before do
+          b = builds.last
+          get '/ddtf/tests',
+              { q: "name : #{b.name} #{invalid_expression}" },
+              headers
+        end
+
+        it 'returns 400' do
+          expect(last_response.status).to eq 400
+        end
+
+        it 'says what is wrong' do
+          response = MultiJson.load(last_response.body)
+          expect(response['message']).to include(invalid_expression)
+        end
       end
     end
 
@@ -416,7 +425,7 @@ describe 'DDTF' do
 
       it 'returns detailed description' do
         post '/ddtf/tests', post_payload, headers
-        expect(JSON.parse(last_response.body)).to include('error' => 'Could not create new build')
+        expect(JSON.parse(last_response.body)).to include('message' => 'Could not create new build')
       end
     end
 

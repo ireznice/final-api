@@ -3,6 +3,7 @@ ENV['ENV'] = ENV['RAILS_ENV'] = ENV['RACK_ENV'] = 'test'
 require 'factory_girl'
 require 'database_cleaner'
 require 'final-api'
+require 'final-api/v1/http'
 require 'rack/test'
 require 'factories'
 require 'sidekiq/testing'
@@ -11,7 +12,7 @@ require 'test_aggregation'
 
 FinalAPI.setup
 FinalAPI.logger = Logger.new(StringIO.new)
-
+# ActiveRecord::Base.logger = Logger.new(STDOUT)
 
 
 DatabaseCleaner.clean_with(:truncation)
