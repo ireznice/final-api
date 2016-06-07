@@ -56,21 +56,23 @@ module FinalAPI
 
           # /ddtf/tests?limit=20&offset=0&q=yyyy+id:+my_id
           app.get '/ddtf/tests' do
-            limit = params[:limit] ? params[:limit].to_i : 20
-            offset = params[:offset] ? params[:offset].to_i : 0
-            builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
-            builds = builds.ddtf_search(params[:q])
+            begin
+              limit = params[:limit] ? params[:limit].to_i : 20
+              offset = params[:offset] ? params[:offset].to_i : 0
+              builds = Build.search(params[:q], limit, offset)
 
-            # HACK: workaround make builds valid, could be removed later, when DB
-            # will be valid
-            builds.each { |b| b.sanitize }
-
-            FinalAPI::V1::Http::DDTF_Builds.new(builds, {}).data.to_json
+              FinalAPI::V1::Http::DDTF_Builds.new(builds, {}).data.to_json
+            rescue Build::InvalidQueryError => e
+              halt 404, {
+                status: 'error',
+                message: e.to_s
+              }.to_json
+            end
           end
 
           app.get '/ddtf/tests/:id/executionLogs' do
             build = Build.find(params[:id])
-            
+
             FinalAPI::V1::Http::DDTF_Build.new(build).execution_logs.to_json
           end
 

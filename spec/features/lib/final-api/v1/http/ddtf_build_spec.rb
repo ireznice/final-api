@@ -13,8 +13,10 @@ describe FinalAPI::V1::Http::DDTF_Build do
             build_info: 'quux',
             state: 'garply',
             created_at: 'foo',
+            canceled_at: 'foop',
             started_at: 'bar',
             stopped_by: fake_user,
+            execution_logs: [],
             owner: fake_user,
             parts_groups: [],
             matrix: {},
@@ -41,7 +43,7 @@ describe FinalAPI::V1::Http::DDTF_Build do
       %w{started Started STARTED} => 'Running',
       %w{canceled Canceled CANCELED} => 'Stopped',
       %w{errored Errored ERRORED} => 'Aborted',
-      [nil, ''] => 'Unknown',
+      [nil, ''] => 'Unbeknownst',
     }.each do |k, v|
       context "returns correct state: #{v}" do
         k.each do |state|
@@ -62,7 +64,7 @@ describe FinalAPI::V1::Http::DDTF_Build do
   end
 
   context '#state2api_v1status' do
-    it 'returns NotStep when bug occured' do
+    it 'returns NotSet when bug occured' do
       fake_step[:result] = 'pending'
       fake_step[:data][:status] = nil
       expect(subject.send(:state2api_v1status, fake_step)).to eq 'NotSet'
@@ -73,9 +75,9 @@ describe FinalAPI::V1::Http::DDTF_Build do
       { result: 'blocked', data: {} } => 'NotTested',
       { result: 'passed', data: {}  } => 'Passed',
       { result: 'failed', data: {}  } => 'Failed',
-      { result: 'failed', data: { status: 'known_bug'} } => 'KnownBug',
-      { result: 'pending', data: { status: 'not_performed'} } => 'NotPerformed',
-      { result: 'pending', data: { status: 'skipped'} } => 'Skipped',
+      { result: 'failed', data: { 'status' => 'known_bug'} } => 'KnownBug',
+      { result: 'pending', data: { 'status' => 'not_performed'} } => 'NotPerformed',
+      { result: 'pending', data: { 'status' => 'skipped'} } => 'Skipped',
     }.each do |k, v|
       it "returns #{v} for #{k}" do
         expect(subject.send(:state2api_v1status, k)).to eq v
