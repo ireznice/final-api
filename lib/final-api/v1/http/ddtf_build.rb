@@ -18,7 +18,7 @@ module FinalAPI
           'failed' => 'Finished',
           'canceled' => 'Stopped',
           'errored' => 'Aborted',
-          '' => 'Unknown'
+          '' => 'Unbeknownst'
         }
 
         STATE2API_V1STATUS = {
@@ -137,7 +137,7 @@ module FinalAPI
 
         def product
           tsd = build.config[:tsdContent]
-          tsd[:product] if tsd
+          tsd[:product] if tsd && tsd.is_a?(Hash)
         end
 
         # returns hash of results of all test

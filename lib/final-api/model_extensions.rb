@@ -13,23 +13,32 @@ class Build
     ['sto', 'stoppedby']      => 'stopped_by_id',
     ['sts', 'stat', 'status', 'state'] => 'state',
     ['bui', 'build']          => 'build_info',
-    ['buildid', 'protonid']  => 'protonId'
+    ['buildid', 'protonid']  => 'proton_id'
   }
 
   def self.search(query, limit, offset)
-    search_struct = parse_query(query)
-    query = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
-    search_struct.each do |request|
-      if request[1] == ":"
-        query = query.where("#{request[0]} ILIKE :expr", expr: "%#{request[2]}%")
+    builds = Build.order(Build.arel_table['created_at'].desc).limit(limit).offset(offset)
+    return builds if query.nil?
+    expressions = parse_query(query)
+    expressions.each do |expr|
+      case expr[0]
+      when 'owner_id', 'stopped_by_id'
+        builds = builds.where(expr[0].to_sym => retrieve_users(expr[2]))
+      when 'state'
+        builds = builds.where(expr[0].to_sym => retrieve_states(expr[2]))
       else
-        query = query.where("#{request[0]} = :expr", expr: "%#{request[2]}%")
+        if expr[1] == ":"
+          builds = builds.where("#{expr[0]}::text ILIKE :expr", expr: "%#{expr[2]}%")
+        else
+          builds = builds.where(expr[0].to_sym => expr[2])
+        end
       end
     end
 
-    query
+    builds
   end
 
+=begin
   def self.ddtf_search(query)
     res = scoped
     return res if query.blank?
@@ -76,7 +85,7 @@ class Build
     end
     where([column, operator, '(?)'].join(' '), term)
   end
-
+=end
 
   def parts_groups
     matrix.group_by do |t|
@@ -96,12 +105,19 @@ class Build
 
   private
 
+  # Returns list of parsed subqueries
+  #
+  # For example:
+  #   parse_query('nam:"foo bar baz" bui =qux id : 1')
+  #     => [ ['nam', ':', 'foo bar baz'], ['bui', '=', 'qux'], ['id', ':', '1']]
   def self.parse_query(query)
     array = query.scan(/([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/)
+    return [['name' , ':', query]] if array.length == 0
     array.map do |item|
       query_key = item[0].downcase
       column = SEARCH_TOKENS_DEF.select { |k| k.include? query_key }.values.first
-      raise "Wrong search definition specified" if column.nil?
+      # TODO: return nil instead, then return status 400 or so and nice error message
+      raise "Wrong search definition specified: #{query_key}" if column.nil?
 
       [
         column,
@@ -110,6 +126,19 @@ class Build
       ]
     end
   end
+
+  def self.retrieve_users(query)
+    User.where("name ILIKE :expr", expr: "%#{query}%").each_with_object([]) {|u,out| out << u.id }
+  end
+
+  # maps fragment of old state given to travis states
+  def self.determine_states(query)
+    states_map = FinalAPI::V1::Http::DDTF_Build::BUILD_STATE2API_V1STATUS
+    states_map.reject { |k,v| k == '' }.each_with_object([]) do |(new, old), out|
+      out << new if old.downcase.include? query.downcase
+    end.compact
+  end
+
 end
 
 class Job
