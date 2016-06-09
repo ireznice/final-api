@@ -4,7 +4,7 @@ describe Build do
     it 'use JSON \'name\' column when no column expressions are used' do
       b = Build
       expect(b).to receive(:ddtf_search_column).with("config ->> 'name'", ':', 'TERM')
-      b.ddtf_search('TERM')
+      b.search('TERM', 42, 0)
     end
 
     it 'search for equal in name and nam' do
