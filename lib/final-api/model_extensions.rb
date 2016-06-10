@@ -21,71 +21,23 @@ class Build
     return builds if query.nil?
     expressions = parse_query(query)
     expressions.each do |expr|
+      exact_match = (expr[1] == '=')
       case expr[0]
       when 'owner_id', 'stopped_by_id'
-        builds = builds.where(expr[0].to_sym => retrieve_users(expr[2]))
+        builds = builds.where(expr[0].to_sym => retrieve_users(expr[2], exact_match))
       when 'state'
-        builds = builds.where(expr[0].to_sym => retrieve_states(expr[2]))
+        builds = builds.where(expr[0].to_sym => determine_states(expr[2], exact_match))
       else
-        if expr[1] == ":"
-          builds = builds.where("#{expr[0]}::text ILIKE :expr", expr: "%#{expr[2]}%")
-        else
+        if exact_match
           builds = builds.where(expr[0].to_sym => expr[2])
+        else
+          builds = builds.where("#{expr[0]}::text ILIKE :expr", expr: "%#{expr[2]}%")
         end
       end
     end
 
     builds
   end
-
-=begin
-  def self.ddtf_search(query)
-    res = scoped
-    return res if query.blank?
-    res_query = query.dup
-    SEARCH_TOKENS_DEF.each_pair do |keys, column|
-      if res_query.sub!(/(?:#{keys.join('|')})\s*([:=])\s*("(?:[^"]*?")|\S+)/, '')
-        op = $1
-        term = $2.gsub(/\A"(.*)"\z/, '\1')
-        res = res.ddtf_search_column(column, op, term)
-      end
-    end
-    # when no keyword found search in `name` field by "contaions" operator
-    if res_query == query
-      res = res.ddtf_search_column('name', ':', query)
-    end
-    res
-  end
-
-  def self.ddtf_search_column(column, operator, term)
-    if (column == 'owner_id') || (column == 'stopped_by_id')
-      if operator == ':'
-        term = User.where("name ILIKE ?", "%#{term}%").pluck(:id)
-      else
-        term = User.where(name: term).pluck(:id)
-      end
-      operator = 'IN'
-    end
-
-    case operator
-    when '='
-      # makes search quite slow (and without index)
-      # but users are unaware of types, and could write: WHERE id = 'string'
-      # which leads to error:
-      #   PG::InvalidTextRepresentation: ERROR:  invalid input syntax for integer
-      column = "(#{column})::text"
-    when ':'
-      operator = 'ILIKE'
-      term = "%#{term}%"
-      column = "(#{column})::text"
-    when 'IN'
-      # empty
-    else
-      fail "Unknown operator: #{operator.inspect}"
-    end
-    where([column, operator, '(?)'].join(' '), term)
-  end
-=end
 
   def parts_groups
     matrix.group_by do |t|
@@ -127,15 +79,23 @@ class Build
     end
   end
 
-  def self.retrieve_users(query)
-    User.where("name ILIKE :expr", expr: "%#{query}%").each_with_object([]) {|u,out| out << u.id }
+  def self.retrieve_users(query, exact_match = false)
+    if exact_match
+      User.where(name: query).each_with_object([]) {|u,out| out << u.id }
+    else
+      User.where("name ILIKE :expr", expr: "%#{query}%").each_with_object([]) {|u,out| out << u.id }
+    end
   end
 
   # maps fragment of old state given to travis states
-  def self.determine_states(query)
+  def self.determine_states(query, exact_match = false)
     states_map = FinalAPI::V1::Http::DDTF_Build::BUILD_STATE2API_V1STATUS
     states_map.reject { |k,v| k == '' }.each_with_object([]) do |(new, old), out|
-      out << new if old.downcase.include? query.downcase
+      if exact_match
+        out << new if old.downcase == query.downcase
+      else
+        out << new if old.downcase.include? query.downcase
+      end
     end.compact
   end
 
