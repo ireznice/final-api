@@ -3,6 +3,9 @@ require 'final-api/ddtf'
 class Build
   include FinalAPI::DDTF
 
+  class InvalidQueryError < StandardError
+  end
+
   # Represents metadat for query language used by frondend
   # *key* are query keywords
   # *values* are columns in DB
@@ -21,19 +24,7 @@ class Build
     return builds if query.nil?
     expressions = parse_query(query)
     expressions.each do |expr|
-      exact_match = (expr[1] == '=')
-      case expr[0]
-      when 'owner_id', 'stopped_by_id'
-        builds = builds.where(expr[0].to_sym => retrieve_users(expr[2], exact_match))
-      when 'state'
-        builds = builds.where(expr[0].to_sym => determine_states(expr[2], exact_match))
-      else
-        if exact_match
-          builds = builds.where(expr[0].to_sym => expr[2])
-        else
-          builds = builds.where("#{expr[0]}::text ILIKE :expr", expr: "%#{expr[2]}%")
-        end
-      end
+      builds = builds.where(retrieve_filter(expr))
     end
 
     builds
@@ -65,11 +56,11 @@ class Build
   def self.parse_query(query)
     array = query.scan(/([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/)
     return [['name' , ':', query]] if array.length == 0
-    array.map do |item|
+    wrong_keys = []
+    result = array.map do |item|
       query_key = item[0].downcase
       column = SEARCH_TOKENS_DEF.select { |k| k.include? query_key }.values.first
-      # TODO: return nil instead, then return status 400 or so and nice error message
-      raise "Wrong search definition specified: #{query_key}" if column.nil?
+      wrong_keys << query_key if column.nil?
 
       [
         column,
@@ -77,6 +68,11 @@ class Build
         item[2].tr("\"", '')
       ]
     end
+
+    raise InvalidQueryError,
+          "Wrong search definition(s) specified: #{wrong_keys.join(", ")}" unless wrong_keys.empty?
+
+    result
   end
 
   def self.retrieve_users(query, exact_match = false)
@@ -99,6 +95,21 @@ class Build
     end.compact
   end
 
+  def self.retrieve_filter(expr)
+    exact_match = (expr[1] == '=')
+    case expr[0]
+    when 'owner_id', 'stopped_by_id'
+      { expr[0].to_sym => retrieve_users(expr[2], exact_match) }
+    when 'state'
+      { expr[0].to_sym => determine_states(expr[2], exact_match) }
+    else
+      if exact_match
+        { expr[0].to_sym => expr[2] }
+      else
+         [ "#{expr[0]}::text ILIKE :expr", expr: "%#{expr[2]}%" ]
+      end
+    end
+  end
 end
 
 class Job

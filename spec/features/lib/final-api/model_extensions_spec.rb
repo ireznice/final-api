@@ -15,8 +15,6 @@ describe Build do
       FactoryGirl.create_list(:build_customized, 20, build_overrides)
     end
 
-    #before { builds }
-
     it 'applies limit' do
       expect(Build.search("", 5, 0).length).to eq(5)
     end
@@ -33,7 +31,7 @@ describe Build do
       end
 
       context 'when id does not exist' do
-        it 'returns empty array' do
+        it 'returns an empty array' do
           expect(Build.search("id = \"99999999999999\" ", 5, 0).length).to eq(0)
         end
       end
@@ -45,7 +43,7 @@ describe Build do
         expect(filtered.length).to eq(1)
       end
 
-      it 'filters by startedBy and returns all suitable items' do
+      it 'filters by startedBy' do
         builds << FactoryGirl.create(:build_customized, owner: user2)
         filtered = Build.search("sta = franta.lopata", 500, 0)
         expect(filtered.length).to eq(20)
@@ -58,7 +56,7 @@ describe Build do
         expect(filtered.length).to eq(1)
       end
 
-      context 'when spoppedBy does not exist' do
+      context 'when stoppedBy does not exist' do
         it 'returns no items' do
           builds << FactoryGirl.create(:build_customized, stopped_by: user1, owner: user2)
           filtered = Build.search("sto= \"frant\" ", 500, 0)
@@ -175,16 +173,17 @@ describe Build do
     end
   end
 
-  context 'parsing input queries' do
+  describe '::patse_query' do
     {
-      "id:0" => [['id', ':', '0']],
-      "sta:jan.topor name:releasetest build:3580 sto:petr.s status:finished" => [
-        ["owner_id", ":", "jan.topor"],
-        ["name", ":", "releasetest"],
-        ["build_info", ":", "3580"],
-        ["stopped_by_id", ":", "petr.s"],
-        ["state", ":", "finished"]
-      ]
+      'id:0' => [['id', ':', '0']],
+      'sta:jan.topor name:releasetest build:3580 sto:petr.s status:finished' => [
+        ['owner_id', ':', 'jan.topor'],
+        ['name', ':', 'releasetest'],
+        ['build_info', ':', '3580'],
+        ['stopped_by_id', ':', 'petr.s'],
+        ['state', ':', 'finished']
+      ],
+      '' => [['name', ':', '']]
     }.each do |k, v|
       it "returns correct output for \"#{k}\"" do
         expect(Build.parse_query(k)).to eq(v)
