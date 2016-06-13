@@ -78,7 +78,8 @@ describe Build do
 
       it 'filters by state Configured' do
         results = Build.search("sts= Configured", 100, 0)
-        expect(results.length).to eq(6)
+        count_wanted = builds.keep_if {|i| i.state == 'created'}.size
+        expect(results.length).to eq(count_wanted)
         results.each do |build|
           expect(build.state).to eq('created')
         end
@@ -156,7 +157,8 @@ describe Build do
 
       it 'filters by state Configured' do
         results = Build.search("sts: Confi", 100, 0)
-        expect(results.length).to eq(6)
+        count_wanted = builds.keep_if {|i| i.state == 'created'}.size
+        expect(results.length).to eq(count_wanted)
         results.each do |build|
           expect(build.state).to eq('created')
         end
@@ -164,7 +166,8 @@ describe Build do
 
       it 'filters by state Finished' do
         results = Build.search("sts: Fin", 100, 0)
-        expect(results.length).to eq(13)
+        count_wanted = builds.keep_if {|i| i.state == 'passed'}.size
+        expect(results.length).to eq(count_wanted)
         results.each do |build|
           expect(build.state).to eq('passed')
         end
