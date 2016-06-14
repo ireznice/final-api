@@ -416,7 +416,7 @@ describe 'DDTF' do
 
       it 'returns detailed description' do
         post '/ddtf/tests', post_payload, headers
-        expect(JSON.parse(last_response.body)).to include('error' => 'Could not create new build')
+        expect(JSON.parse(last_response.body)).to include('message' => 'Could not create new build')
       end
     end
 
