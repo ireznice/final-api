@@ -44,8 +44,16 @@ class Build
   #   parse_query('nam:"foo bar baz" bui =qux id : 1')
   #     => [ ['nam', ':', 'foo bar baz'], ['bui', '=', 'qux'], ['id', ':', '1']]
   def self.parse_query(query)
-    array = query.scan(/([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/)
-    return [['name' , ':', query]] if array.length == 0
+    expression_pattern = /([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/
+    parts = query.partition(expression_pattern)
+    unmatched = !parts[0].empty? || !parts[2].empty?
+    puts 'unmatched'
+    puts unmatched
+    puts '>>>>>>>>>>>>>>>>>>>>'
+    puts parts
+    raise InvalidQueryError, 'BOOM!' if unmatched
+    array = query.scan(expression_pattern)
+    return [['name', ':', query]] if array.empty?
     wrong_keys = []
     result = array.map do |item|
       query_key = item[0].downcase
@@ -96,9 +104,9 @@ class Build
       { key.to_sym => determine_states(value, exact_match) }
     else
       if exact_match
-        { key.to_sym => value }
+        [ "#{key}::text ILIKE :expr", expr: "#{value}" ]
       else
-         [ "#{key}::text ILIKE :expr", expr: "%#{value}%" ]
+        [ "#{key}::text ILIKE :expr", expr: "%#{value}%" ]
       end
     end
   end

@@ -30,6 +30,20 @@ describe Build do
         expect(Build.search("id = \"#{id}\" ", 5, 0).first.id).to eq(id)
       end
 
+      context 'when name is exact' do
+        it 'filters by name' do
+          build = builds[9]
+          expect(Build.search("name   = \"#{build.name}\" ", 5, 0).first.id).to eq(build.id)
+        end
+      end
+
+      context 'when name is upcased' do
+        it 'filters by name' do
+          build = builds[9]
+          expect(Build.search("nam=\"#{build.name.upcase}\" ", 5, 0).first.id).to eq(build.id)
+        end
+      end
+
       context 'when id does not exist' do
         it 'returns an empty array' do
           expect(Build.search("id = \"99999999999999\" ", 5, 0).length).to eq(0)
@@ -37,14 +51,14 @@ describe Build do
       end
 
       context 'filters by StartedBy' do
-        it 'test 1' do
+        it 'passes test 1' do
           builds << FactoryGirl.create(:build_customized, owner: user2)
           filtered = Build.search("sta = #{user2.name}", 5, 0)
           expect(filtered.first.owner.name).to eq(user2.name)
           expect(filtered.length).to eq(1)
         end
 
-        it 'test 2' do
+        it 'passes test 2' do
           builds << FactoryGirl.create(:build_customized, owner: user2)
           filtered = Build.search("sta = #{user1.name}", 500, 0)
           expect(filtered.length).to eq(20)
@@ -184,6 +198,7 @@ describe Build do
   describe '::parse_query' do
     {
       'id:0' => [['id', ':', '0']],
+      'name:foo bar' => [['name', ':', 'foo']],
       'sta:jan.topor name:releasetest build:3580 sto:petr.s status:finished' => [
         ['owner_id', ':', 'jan.topor'],
         ['name', ':', 'releasetest'],
@@ -195,6 +210,15 @@ describe Build do
     }.each do |k, v|
       it "returns correct output for \"#{k}\"" do
         expect(Build.parse_query(k)).to eq(v)
+      end
+    end
+
+    {
+      'foo:bar' => nil,
+      'name:qux quux' => nil
+    }.each do |k, v|
+      it "throws specific exception for input: \"#{k}\"" do
+        expect{Build.parse_query(k)}.to raise_error(Build::InvalidQueryError)
       end
     end
   end
