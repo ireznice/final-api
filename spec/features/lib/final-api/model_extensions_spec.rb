@@ -198,8 +198,8 @@ describe Build do
   describe '::parse_query' do
     {
       'id:0' => [['id', ':', '0']],
-      'name:foo bar' => [['name', ':', 'foo']],
-      'sta:jan.topor name:releasetest build:3580 sto:petr.s status:finished' => [
+      'name:"foo bar"' => [['name', ':', 'foo bar']],
+      '    sta:jan.topor name:releasetest build:3580 sto:petr.s status:finished' => [
         ['owner_id', ':', 'jan.topor'],
         ['name', ':', 'releasetest'],
         ['build_info', ':', '3580'],
@@ -215,9 +215,11 @@ describe Build do
 
     {
       'foo:bar' => nil,
-      'name:qux quux' => nil
+      'name:qux quux' => nil,
+      'quux name:foo' => nil,
+      'name:foo bar bui:quux' => nil,
     }.each do |k, v|
-      it "throws specific exception for input: \"#{k}\"" do
+      it "throws InvalidQueryError exception for input: \"#{k}\"" do
         expect{Build.parse_query(k)}.to raise_error(Build::InvalidQueryError)
       end
     end

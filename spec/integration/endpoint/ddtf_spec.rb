@@ -187,7 +187,7 @@ describe 'DDTF' do
       end
 
 
-      it 'search by combination of keywords' do
+      it 'searches by combination of keywords' do
         b = builds.last
         get '/ddtf/tests',
             { q: "name : #{b.name} id = \"#{b.id}\"" },
@@ -197,14 +197,18 @@ describe 'DDTF' do
         expect(response.first['id']).to eq b.id
       end
 
-      it 'ignore words without column definition' do
-        b = builds.last
-        get '/ddtf/tests',
+      context 'when invalid query given' do
+        it 'returns 404' do
+          b = builds.last
+          get '/ddtf/tests',
             { q: "name : #{b.name} XXXXX" },
-            headers
-        response = MultiJson.load(last_response.body)
-        expect(response.size).to eq 1
-        expect(response.first['id']).to eq b.id
+          headers
+          response = MultiJson.load(last_response.body)
+          puts '>>>>>>>>>>>>>'
+          puts response
+          expect(response.size).to eq 1
+          expect(response.first['id']).to eq b.id
+        end
       end
     end
 

@@ -38,6 +38,12 @@ class Build
 
   private
 
+  def self.check_query(query)
+    q = query.dup
+    while q.slice!(query_pattern) != nil do end
+    raise InvalidQueryError unless q =~ /^\s*$/
+  end
+
   # Returns list of parsed subqueries
   #
   # For example:
@@ -45,13 +51,7 @@ class Build
   #     => [ ['nam', ':', 'foo bar baz'], ['bui', '=', 'qux'], ['id', ':', '1']]
   def self.parse_query(query)
     expression_pattern = /([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/
-    parts = query.partition(expression_pattern)
-    unmatched = !parts[0].empty? || !parts[2].empty?
-    puts 'unmatched'
-    puts unmatched
-    puts '>>>>>>>>>>>>>>>>>>>>'
-    puts parts
-    raise InvalidQueryError, 'BOOM!' if unmatched
+    check_query(query)
     array = query.scan(expression_pattern)
     return [['name', ':', query]] if array.empty?
     wrong_keys = []
@@ -74,7 +74,9 @@ class Build
 
     result
   end
-
+  def self.query_pattern
+    /([^\s]*)\s*([:=])\s*("[^"]*"|\S*)/
+  end
   def self.retrieve_users(query, exact_match = false)
     if exact_match
       User.where(name: query).each_with_object([]) {|u,out| out << u.id }
